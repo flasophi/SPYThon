@@ -1,3 +1,23 @@
+# The Catalog is accessible through REST web services.
+# The broker is identified with broker_IP and broker_port. It must be set with a POST request. At start-up both fields are None.
+# Devices are stored as: ID, IP, GET (list of urls to access GET method), POST (list of urls to access POST method),
+# sub_topics (list of MQTT topics which the device is subscribed to), pub_topics (list of MQTT topics for which the device publishes),
+# resources (list of sensors/actuators), conf (configurations for the control strategies). If a field is empty it is None.
+# Users are stored as: ID, name, surname and email.
+# - GET: - /broker/ -> Retrieve information about IP address and port of the message broker in the platform
+#        - /devices/ -> Retrieve list of registered devices
+#        - /device?ID=<id> -> Retrieve information about a device with a specific id
+#        - /users/ -> Retrieve list of registered users
+#        - /user?ID=<id> -> Retrieve information about a user with a specific id
+#
+# - POST: - /register_broker/ -> Registration of the MQTT message broker (IP and port)
+#         - /add_device/ ->  Registration or update of a device
+#         - /add_user/ -> Registration or update of a user
+#
+# -DELETE: - /device/ -> delete a device (done automatically every 2 minutes for devices older than 30 minutes)
+#          - /user/ -> delete a user
+
+
 import cherrypy
 import json
 import time
@@ -83,7 +103,7 @@ class RESTCatalog:
         dict = json.loads(json_file)
         file.close()
 
-        # Registration of the MQTT message broker (IP and port)
+        # /register_broker/ -> Registration of the MQTT message broker (IP and port)
         if uri[0] == 'register_broker':
             try:
                 dict['broker_IP'] = data['broker_IP']
@@ -95,14 +115,16 @@ class RESTCatalog:
             file.write(json.dumps(dict))
             file.close()
 
-        # Registration or update of a device
+        # /add_device/ ->  Registration or update of a device
         elif uri[0] == 'add_device':
             for device in dict['devices']:
                 if device['ID'] == data['ID']:
                     try:
+                        device['IP'] = data['IP']
                         device['GET'] = data['GET']
                         device['POST'] = data['POST']
-                        device['topics'] = data['topics']
+                        device['sub_topics'] = data['sub_topics']
+                        device['pub_topics'] = data['pub_topics']
                         device['resources'] = data['resources']
                         device['conf'] = data['conf']
                         device['insert-timestamp'] = time.time()
@@ -117,9 +139,11 @@ class RESTCatalog:
 
             try:
                 dict['devices'].append({'ID': data['ID'],
+                                    'IP': data['IP'],
                                     'GET': data['GET'],
                                     'POST': data['POST'],
-                                    'topics': data['topics'],
+                                    'sub_topics': data['sub_topics'],
+                                    'pub_topics': data['pub_topics'],
                                     'resources': data['resources'],
                                     'conf': data['conf'],
                                     'insert-timestamp': time.time()})
@@ -130,7 +154,7 @@ class RESTCatalog:
             file.write(json.dumps(dict))
             file.close()
 
-        # Registration or update of a user
+        # /add_user/ -> Registration or update of a user
         elif uri[0] == 'add_user':
             for user in dict['users']:
                 if user['ID'] == data['ID']:
@@ -156,7 +180,8 @@ class RESTCatalog:
 
         threadLock.release()
 
-    def DELETE(self, **params):
+    def DELETE(self, *uri, **params):
+
         threadLock.acquire()
 
         try:
@@ -168,14 +193,28 @@ class RESTCatalog:
         dict = json.loads(file.read())
         file.close()
 
-        for device in dict['devices']:
-            if device['ID'] == ID:
-                dict['devices'].remove(device)
-                #print 'Removed a device'
-                file = open(filename, 'w')
-                file.write(json.dumps(dict))
-                file.close()
-                break
+        # /device/ -> delete a device
+        if uri[0] == 'device':
+            for device in dict['devices']:
+                if device['ID'] == ID:
+                    dict['devices'].remove(device)
+                    file = open(filename, 'w')
+                    file.write(json.dumps(dict))
+                    file.close()
+                    break
+
+        # /user/ -> delete a user
+        elif uri[0] == 'user':
+            for user in dict['users']:
+                if user['ID'] == ID:
+                    dict['users'].remove(user)
+                    file = open(filename, 'w')
+                    file.write(json.dumps(dict))
+                    file.close()
+                    break
+
+        else:
+            raise cherrypy.HTTPError(400)
 
         threadLock.release()
 
@@ -195,8 +234,8 @@ class DeleteDevice(threading.Thread):
 
             for device in dict['devices']:
                 if time.time() - device['insert-timestamp'] > 1800:
-                    URL = 'http://localhost:8080/'
-                    params = {'ID':device['ID']}
+                    URL = 'http://localhost:8080/device/'
+                    params = {'ID': device['ID']}
                     try:
             			r = requests.delete(URL, params = params)
             			r.raise_for_status()
