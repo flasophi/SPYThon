@@ -60,7 +60,7 @@ class WebLight:																		# REST CORRESPONDENT TO LIGHT CONTROL
 
 class MQTTControl():
 	
-	def __init__(self, clientID, controller, broker):
+	def __init__(self, deviceID, controller, broker):
 
 		try:
 			self.broker = broker
@@ -68,13 +68,13 @@ class MQTTControl():
 			raise "no broker registered"																# check the correct format for the error, here
 		
 		self.controller = controller
-		self.clientID = clientID
+		self.deviceID = deviceID
 		self.topic = ""
 		self.input = ""
 		self.flag = 0
 		
 		# create an instance of paho.mqtt.client
-		self._paho_mqtt = PahoMQTT.Client(clientID, False) 
+		self._paho_mqtt = PahoMQTT.Client(deviceID, False) 
 
 		# register the callback
 		self._paho_mqtt.on_connect = self.myOnConnect
@@ -267,8 +267,8 @@ if __name__ == '__main__':
 	Charmender = TempControl()
 	Pikachu = LightControl()
 	
-	TempActor = MQTTControl(Charmender, broker)
-	LightActor = MQTTControl(Pikachu, broker)
+	TempActor = MQTTControl(deviceID, Charmender, broker)
+	LightActor = MQTTControl(ddeviceID, Pikachu, broker)
 	
 	temp_registration = TempRegistration(Charmender, deviceID, catalogIP)
 	light_registration = LightRegistration(Pikachu, deviceID, catalogIP)
