@@ -60,10 +60,11 @@ class WebLight:																		# REST CORRESPONDENT TO LIGHT CONTROL
 
 class MQTTControl():
 	
-	def __init__(self, deviceID, controller, broker):
+	def __init__(self, deviceID, controller, brokerip, brokerport):
 
 		try:
-			self.broker = broker
+			self.broker = brokerip
+			self.port = brokerport
 		except:
 			raise "no broker registered"																# check the correct format for the error, here
 		
@@ -82,12 +83,12 @@ class MQTTControl():
 		
 	def myOnConnect(self, paho_mqtt, userdata, flags, rc):
 	
-		print ("Connected to %s with result code: %d" % (self.messageBroker, rc))
+		print ("Connected to %s with result code: %d" % (self.broker, rc))
 		
 	def myOnMessage(self, paho_mqtt, userdata, msg):
 
 		# A new message is received
-		print ("Topic:'" + msg.topic+"', QoS: '"+str(msg.qos)+"' Message: '"+str(msg.payload) + "'")
+		print ("Topic:'" + msg.topic + "', QoS: '" + str(msg.qos) + "' Message: '" + str(msg.payload) + "'")
 		self.flag = 1
 		self.topic = msg.topic
 		self.input = msg.payload
@@ -260,6 +261,8 @@ if __name__ == '__main__':
 	try:
 		broker = requests.get("http://" + catalogip + ":8080/broker")									# better specify port on the config file?
 		broker.raise_for_status()
+		brokerip = broker["broker_IP"]
+		brokerport = broker["broker_port"]
 	except requests.HTTPError as err:
 		print "Error retrieving the broker"
 		sys.exit()
@@ -267,8 +270,8 @@ if __name__ == '__main__':
 	Charmender = TempControl()
 	Pikachu = LightControl()
 	
-	TempActor = MQTTControl(deviceID, Charmender, broker)
-	LightActor = MQTTControl(ddeviceID, Pikachu, broker)
+	TempActor = MQTTControl(deviceID, Charmender, brokerip, brokerport)
+	LightActor = MQTTControl(ddeviceID, Pikachu, brokerip, brokerport)
 	
 	temp_registration = TempRegistration(Charmender, deviceID, catalogIP)
 	light_registration = LightRegistration(Pikachu, deviceID, catalogIP)
