@@ -28,7 +28,7 @@ from TempControl import *
 from LightControl import *
 	
 			#	RAISE EXCEPTIONS, ARSEHOLE
-			
+
 class WebTemp:																		# REST CORRESPONDENT TO TEMPERATURE CONTROL
 	
 	def __init__(self, controller):
