@@ -1,0 +1,1 @@
+{"broker_IP": "192.168.1.126", "temp_controls": [], "users": [{"nickname": "Flavia Sofia", "ID": "user0", "chat_id": 165403961}], "light_controls": [], "terraria": [], "broker_port": 1883}

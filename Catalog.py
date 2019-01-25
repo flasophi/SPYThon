@@ -1,453 +1,485 @@
-# The Catalog is accessible through REST web services.
-# The broker is identified with broker_IP and broker_port. It is set as written in the Catalog.txt file.
-# Users are stored as: ID, nickname.
-# Devices can be terraria or control strategies.
-# - GET: - /broker/ -> Retrieve information about IP address and port of the message broker in the platform
-#        - /terraria/ -> Retrieve list of registered terraria
-#        - /terrarium?ID=<id> -> Retrieve information about a terrarium with a specific id
-#        - /users/ -> Retrieve list of registered users
-#        - /user?ID=<id> -> Retrieve information about a user with a specific id
-#        - associate?IDTerr=<IDTerrarium>&IDUs=<IDUser> -> Associate a terrarium to a user
-#        - changetemp?IDTerr=<IDTerrarium>&temp=<temp>
-#        - changelightcycle?IDTerr=<IDTerrarium>&begin=<hour_begin>&duration=<durationhours>
-
-#
-# - POST: - /add_device/terrarium     ->  Registration or update of a terrarium
-#         - /add_device/tempcontrol   ->  Registration or update of a control (can be done only by the control itself)
-#         - /add_device/lightcontrol  ->  Registration or update of a control (can be done only by the control itself)
-#         - /add_user/                -> Registration or update of a user
-#
-# -DELETE: - /device/terrarium    -> delete a device (done automatically every 2 minutes for devices older than 30 minutes)
-#          - /device/tempcontrol  -> delete a device (done automatically every 2 minutes for devices older than 30 minutes)
-#          - /device/lightcontrol -> delete a device (done automatically every 2 minutes for devices older than 30 minutes)
-#          - /user/               -> delete a user
-
-
-import cherrypy
-import json
-import time
 import threading
-import requests
+import time
 
-threadLock = threading.Lock()
-filename = "Catalog.txt"
+# CATALOG. It implements a catalog with the following entries:
+# broker_IP, broker_port, terraria, temperature controls (temp_controls), light_controls, users
+# the catalog is initalized by reading the first version of the catalog json file
+# each access to the json file is protected against multi-threading by a Lock
+# a thread is automatically activated to delete devices (terraria and controls) which are not updated for more than 30 minutes, to prevent requests to wrong IP
+# terraria are identified by: ID, IP, GET, POST, sub_topics, pub_topics, resources, user (ID of the associated user, None if not already associated), insert-timestamp
+# temperature controls are identified by: ID, IP, GET, POST, sub_topics, pub_topics, temp, terrarium (ID of the associated terrarium), insert-timestamp
+# light controls are identified by: ID, IP, GET, POST, sub_topics, pub_topics, dawn, dusk, terrarium (ID of the associated terrarium), insert-timestamp
+# users are identified by an ID, given by the bot, a nickname (the one on Telegram), and by the chat_id to send messages on Telegram.
 
-## REST Web Service
-class RESTCatalog:
+class Catalog:
 
-    exposed = True
+    def __init__(self, filename):
 
-    def __init__(self):
+        self.filename = filename
 
-        # Initializes the first version of the catalog file containing the configured broker_IP and broker_port,
-        # no users no terraria registered yet
-        file = open(filename, 'r')
+        file = open(self.filename, 'r')
         dict_old = json.loads(file.read())
         file.close()
+
         dict_new = {'broker_IP': dict_old['broker_IP'], 'broker_port': dict_old['broker_port'],
-                'terraria': [], 'temp_controls': [], 'light_controls': [], 'users': [] }
-        file = open(filename, 'w')
+                'terraria': dict_old['terraria'], 'temp_controls': dict_old['temp_controls'], 'light_controls': dict_old['light_controls'],
+                'users': dict_old['users'] }
+
+        file = open(self.filename, 'w')
         file.write(json.dumps(dict_new))
         file.close()
 
-    ## WEB SERVICE
-    def GET(self, *uri, **params):
+        self.threadLock = threading.Lock()
 
-        file = open(filename, 'r')
+        self.deletingThread = DeleteDevice(self)
+        self.deletingThread.start()
+
+    def broker(self):
+
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
         json_file = file.read()
         dict = json.loads(json_file)
         file.close()
 
-        if len(uri) == 0:
-            raise cherrypy.HTTPError(400)
+        self.threadLock.release()
 
-        # /broker/ -> Retrieve information about IP address and port of the message broker in the platform
-        if uri[0] == 'broker':
-            out_dict = {'broker_IP': dict['broker_IP'],
-            'broker_port': dict['broker_port']}
-            return json.dumps(out_dict)
+        return dict['broker_IP'], dict['broker_port']
 
-        # /terraria/ -> Retrieve list of registered devices
-        elif uri[0] == 'terraria':
-            return json.dumps(dict['terraria'])
+    def terraria(self):
 
-        # /terrarium?ID=<id> -> Retrieve information about a device with a specific id
-        elif uri[0] == 'terrarium':
-            for device in dict['terraria']:
-                if device['ID'] == params['ID']:
-                    return json.dumps(device)
-            raise cherrypy.HTTPError(404)
+        self.threadLock.acquire()
 
-        # /users/ -> Retrieve list of registered users
-        elif uri[0] == 'users':
-            return json.dumps(dict['users'])
+        file = open(self.filename, 'r')
+        json_file = file.read()
+        dict = json.loads(json_file)
+        file.close()
 
-        # /user?ID=<id> -> Retrieve information about a user with a specific id
-        elif uri[0] == 'user':
-            for user in dict['users']:
-                if user['ID'] == params['ID']:
-                    return json.dumps(user)
-            raise cherrypy.HTTPError(404)
+        self.threadLock.release()
+        return dict['terraria']
 
-        # /associate?IDTerr=<IDTerrarium>&IDUs=<IDUser> -> Associate a terrarium to a user
-        elif uri[0] == 'associate':
-            flag = 0
-            for user in dict['users']:
-                if user['ID'] == params['IDUs']:
-                    flag = 1
-            if flag == 0:
-                raise cherrypy.HTTPError(404)
+    def terrarium(self, ID):
+        self.threadLock.acquire()
 
-            for terr in dict['terraria']:
-                if terr['ID'] == params['IDTerr']:
-                    terr['user'] = params['IDUs']
-                    threadLock.acquire()
-                    file = open(filename, 'w')
+        file = open(self.filename, 'r')
+        json_file = file.read()
+        dict = json.loads(json_file)
+        file.close()
+
+        self.threadLock.release()
+
+        for device in dict['terraria']:
+            if device['ID'] == ID:
+                return device
+        return "Terrarium not found"
+
+
+    def users(self):
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
+        json_file = file.read()
+        dict = json.loads(json_file)
+        file.close()
+
+        self.threadLock.release()
+        return dict['users']
+
+    def user(self, ID):
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
+        json_file = file.read()
+        dict = json.loads(json_file)
+        file.close()
+        self.threadLock.release()
+
+        for user in dict['users']:
+            if user['ID'] == ID:
+                return json.dumps(user)
+        return "User not found"
+
+    def associate(self, IDUser, IDTerr):
+
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
+        json_file = file.read()
+        dict = json.loads(json_file)
+        file.close()
+
+        # Search for the user
+        flag = 0
+        for user in dict['users']:
+            if user['ID'] == IDUser:
+                flag = 1
+                break
+        if flag == 0:
+            self.threadLock.release()
+            return "Error"
+
+
+        for terr in dict['terraria']:
+            if terr['ID'] == IDTerr:
+                terr['user'] = IDUser
+                file = open(self.filename, 'w')
+                file.write(json.dumps(dict))
+                file.close()
+                self.threadLock.release()
+                return "Done"
+
+        # if terrarium is not found
+        self.threadLock.release()
+        return "Error"
+
+    def changetemp(self, IDTerr, temp):
+
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
+        json_file = file.read()
+        dict = json.loads(json_file)
+        file.close()
+
+        for ctrl in dict['temp_controls']:
+
+            if ctrl['terrarium'] == IDTerr:
+                if temp != 'null':
+                    ctrl['temp'] = temp
+                else:
+                    ctrl['temp'] = None
+
+                file = open(self.filename, 'w')
+                file.write(json.dumps(dict))
+                file.close()
+                self.threadLock.release()
+                return ctrl['IP'], ctrl['port']
+
+        # if the control for that terrarium is not found
+        self.threadLock.release()
+        return "Error", "Error"
+
+    def changelightcycle(self, IDTerr, dawn, dusk):
+
+        self.threadLock.acquire()
+
+        for ctrl in dict['light_controls']:
+
+            if ctrl['terrarium'] == params['IDTerr']:
+
+                if dawn != 'null':
+                    ctrl['dawn'] = dawn
+                    ctrl['dusk'] = dusk
+                else:
+                    ctrl['dawn'] = None
+                    ctrl['dusk'] = None
+
+                file = open(self.filename, 'w')
+                file.write(json.dumps(dict))
+                file.close()
+                self.threadLock.release()
+                return ctrl['IP'], ctrl['port']
+
+        # if the control for that terrarium is not found
+        self.threadLock.release()
+        return "Error", "Error"
+
+
+    def addterrarium(self, data):
+
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
+        json_file = file.read()
+        dict = json.loads(json_file)
+        file.close()
+
+        for device in dict['terraria']:
+            try:
+                if device['ID'] == data['ID']:
+                    device['IP'] = data['IP']
+                    device['port'] = data['port']
+                    device['GET'] = data['GET']
+                    device['POST'] = data['POST']
+                    device['sub_topics'] = data['sub_topics']
+                    device['pub_topics'] = data['pub_topics']
+                    device['resources'] = data['resources']
+                    device['insert-timestamp'] = time.time()
+                    file = open(self.filename, 'w')
                     file.write(json.dumps(dict))
                     file.close()
-                    threadLock.release()
-                    return
-
-            raise cherrypy.HTTPError(404)
-
-        elif uri[0] == 'changetemp':
-            for ctrl in dict['temp_controls']:
-                if ctrl['terrarium'] == params['IDTerr']:
-                    if params['temp'] != 'null':
-                        ctrl['temp'] = params['temp']
-                    else:
-                        ctrl['temp'] = None
-                    threadLock.acquire()
-                    file = open(filename, 'w')
-                    file.write(json.dumps(dict))
-                    file.close()
-                    threadLock.release()
-                    return
-            raise cherrypy.HTTPError(404)
-
-        elif uri[0] == 'changelightcycle':
-            for ctrl in dict['light_controls']:
-
-                if ctrl['terrarium'] == params['IDTerr']:
-                    if params['dawn'] != 'null':
-                        ctrl['dawn'] = params['dawn']
-                        ctrl['dusk'] = params['dusk']
-                    else:
-                        ctrl['dawn'] = None
-                        ctrl['dusk'] = None
-
-                    threadLock.acquire()
-                    file = open(filename, 'w')
-                    file.write(json.dumps(dict))
-                    file.close()
-                    threadLock.release()
-
-                    try:
-                        r = requests.get('http://' + ctrl['IP'] + ':8080/light/', params = {'dawn': ctrl['dawn'], 'dusk': ctrl['dusk']})
-                        r.raise_for_status()
-                    except requests.HTTPError as err:
-                        raise cherrypy.HTTPError(500)
-                        return
-
-                    return
-            raise cherrypy.HTTPError(404)
-
-        else:
-            raise cherrypy.HTTPError(400)
-
-    def POST(self, *uri):
-
-        if len(uri) == 0:
-            raise cherrypy.HTTPError(400)
-        # Reads POST request body
-        mybody = cherrypy.request.body.read()
+                    self.threadLock.release()
+                    return "Update done"
+            except:
+                self.threadLock.release()
+                return "Error"
 
         try:
-            data = json.loads(mybody)
+            dict['terraria'].append({'ID': data['ID'],
+                                'IP': data['IP'],
+                                'port': data['port'],
+                                'GET': data['GET'],
+                                'POST': data['POST'],
+                                'sub_topics': data['sub_topics'],
+                                'pub_topics': data['pub_topics'],
+                                'resources': data['resources'],
+                                'user': None,
+                                'insert-timestamp': time.time()})
+
+            file = open(self.filename, 'w')
+            file.write(json.dumps(dict))
+            file.close()
+            self.threadLock.release()
+            return "Registration done"
         except:
-            raise cherrypy.HTTPError(400)
+            self.threadLock.release()
+            return "Error"
 
-        # Acquires lock to access the catalog file
-        threadLock.acquire()
+    def addtempcontrol(self, data):
 
-        file = open(filename, 'r')
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
         json_file = file.read()
         dict = json.loads(json_file)
         file.close()
 
-        # /add_device/ ->  Registration or update of a device
-        if uri[0] == 'add_device':
-
-            if uri[1] == 'terrarium':
-
-                for device in dict['terraria']:
-                    if device['ID'] == data['ID']:
-                        try:
-                            device['IP'] = data['IP']
-                            device['GET'] = data['GET']
-                            device['POST'] = data['POST']
-                            device['sub_topics'] = data['sub_topics']
-                            device['pub_topics'] = data['pub_topics']
-                            device['resources'] = data['resources']
-                            device['insert-timestamp'] = time.time()
-                        except:
-                            threadLock.release()
-                            raise cherrypy.HTTPError(400)
-
-                        file = open(filename, 'w')
-                        file.write(json.dumps(dict))
-                        file.close()
-                        threadLock.release()
-                        return
-
+        for device in dict['temp_controls']:
+            if device['ID'] == data['ID']:
                 try:
-                    dict['terraria'].append({'ID': data['ID'],
-                                        'IP': data['IP'],
-                                        'GET': data['GET'],
-                                        'POST': data['POST'],
-                                        'sub_topics': data['sub_topics'],
-                                        'pub_topics': data['pub_topics'],
-                                        'resources': data['resources'],
-                                        'user': None,
-                                        'insert-timestamp': time.time()})
+                    device['IP'] = data['IP']
+                    device['port'] = data['port']
+                    device['GET'] = data['GET']
+                    device['POST'] = data['POST']
+                    device['sub_topics'] = data['sub_topics']
+                    device['pub_topics'] = data['pub_topics']
+                    device['temp'] = data['temp']
+                    device['terrarium'] = data['terrarium']
+                    device['insert-timestamp'] = time.time()
+
+                    file = open(self.filename, 'w')
+                    file.write(json.dumps(dict))
+                    file.close()
+                    self.threadLock.release()
+                    return "Update done"
                 except:
-                    threadLock.release()
-                    raise cherrypy.HTTPError(400)
+                    self.threadLock.release()
+                    return "Error"
 
-            elif uri[1] == 'tempcontrol':
-                print data
-                for device in dict['temp_controls']:
-                    if device['ID'] == data['ID']:
-                        try:
-                            device['IP'] = data['IP']
-                            device['GET'] = data['GET']
-                            device['POST'] = data['POST']
-                            device['sub_topics'] = data['sub_topics']
-                            device['pub_topics'] = data['pub_topics']
-                            device['temp'] = data['temp']
-                            device['terrarium'] = data['terrarium']
-                            device['insert-timestamp'] = time.time()
-                        except:
-                            threadLock.release()
-                            raise cherrypy.HTTPError(400)
-                        file = open(filename, 'w')
-                        file.write(json.dumps(dict))
-                        file.close()
-                        threadLock.release()
-                        return
+        try:
+            dict['temp_controls'].append({'ID': data['ID'],
+                                'IP': data['IP'],
+                                'port': data['port'],
+                                'GET': data['GET'],
+                                'POST': data['POST'],
+                                'sub_topics': data['sub_topics'],
+                                'pub_topics': data['pub_topics'],
+                                'temp': data['temp'],
+                                'terrarium': data['terrarium'],
+                                'insert-timestamp': time.time()})
 
-                try:
-                    dict['temp_controls'].append({'ID': data['ID'],
-                                        'IP': data['IP'],
-                                        'GET': data['GET'],
-                                        'POST': data['POST'],
-                                        'sub_topics': data['sub_topics'],
-                                        'pub_topics': data['pub_topics'],
-                                        'temp': data['temp'],
-                                        'terrarium': data['terrarium'],
-                                        'insert-timestamp': time.time()})
-                except:
-                    threadLock.release()
-                    raise cherrypy.HTTPError(400)
-
-            elif uri[1] == 'lightcontrol':
-
-                for device in dict['light_controls']:
-                    if device['ID'] == data['ID']:
-                        try:
-                            device['IP'] = data['IP']
-                            device['GET'] = data['GET']
-                            device['POST'] = data['POST']
-                            device['sub_topics'] = data['sub_topics']
-                            device['pub_topics'] = data['pub_topics']
-                            device['dawn'] = data['dawn']
-                            device['dusk'] = data['dusk']
-                            device['terrarium'] = data['terrarium']
-                            device['insert-timestamp'] = time.time()
-                        except:
-                            threadLock.release()
-                            raise cherrypy.HTTPError(400)
-                        file = open(filename, 'w')
-                        file.write(json.dumps(dict))
-                        file.close()
-                        threadLock.release()
-                        return
-
-                try:
-                    dict['light_controls'].append({'ID': data['ID'],
-                                        'IP': data['IP'],
-                                        'GET': data['GET'],
-                                        'POST': data['POST'],
-                                        'sub_topics': data['sub_topics'],
-                                        'pub_topics': data['pub_topics'],
-                                        'dawn': data['dawn'],
-                                        'dusk': data['dusk'],
-                                        'terrarium': data['terrarium'],
-                                        'insert-timestamp': time.time()})
-                except:
-                    threadLock.release()
-                    raise cherrypy.HTTPError(400)
-
-
-            else:
-                threadLock.release()
-                raise cherrypy.HTTPError(400)
-
-            file = open(filename, 'w')
+            file = open(self.filename, 'w')
             file.write(json.dumps(dict))
             file.close()
+            self.threadLock.release()
+            return "Registration done"
+        except:
+            self.threadLock.release()
+            return "Error"
 
-        # /add_user/ -> Registration or update of a user
-        elif uri[0] == 'add_user':
-            for user in dict['users']:
+    def addlightcontrol(self, data):
+
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
+        json_file = file.read()
+        dict = json.loads(json_file)
+        file.close()
+
+        for device in dict['light_controls']:
+            try:
+                if device['ID'] == data['ID']:
+                    device['IP'] = data['IP']
+                    device['port'] = data['port']
+                    device['GET'] = data['GET']
+                    device['POST'] = data['POST']
+                    device['sub_topics'] = data['sub_topics']
+                    device['pub_topics'] = data['pub_topics']
+                    device['dawn'] = data['dawn']
+                    device['dusk'] = data['dusk']
+                    device['terrarium'] = data['terrarium']
+                    device['insert-timestamp'] = time.time()
+
+                    file = open(self.filename, 'w')
+                    file.write(json.dumps(dict))
+                    file.close()
+                    self.threadLock.release()
+                    return "Update done"
+            except:
+                self.threadLock.release()
+                return "Error"
+
+        try:
+            dict['light_controls'].append({'ID': data['ID'],
+                                'IP': data['IP'],
+                                'port': data['port'],
+                                'GET': data['GET'],
+                                'POST': data['POST'],
+                                'sub_topics': data['sub_topics'],
+                                'pub_topics': data['pub_topics'],
+                                'dawn': data['dawn'],
+                                'dusk': data['dusk'],
+                                'terrarium': data['terrarium'],
+                                'insert-timestamp': time.time()})
+
+            file = open(self.filename, 'w')
+            file.write(json.dumps(dict))
+            file.close()
+            self.threadLock.release()
+            return "Registration done"
+        except:
+            self.threadLock.release()
+            return "Error"
+
+    def adduser(self, data):
+
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
+        json_file = file.read()
+        dict = json.loads(json_file)
+        file.close()
+
+        for user in dict['users']:
+            try:
                 if user['ID'] == data['ID']:
                     user['nickname'] = data['nickname']
-                    file = open(filename, 'w')
+                    user['chat_id'] = data['chat_id']
+                    file = open(self.filename, 'w')
                     file.write(json.dumps(dict))
                     file.close()
-                    threadLock.release()
-                    return
-
-            try:
-                dict['users'].append({'ID': data['ID'],
-                                    'nickname': data['nickname']})
+                    self.threadLock.release()
+                    return "Update done"
             except:
-                threadLock.release()
-                raise cherrypy.HTTPError(400)
-
-            file = open(filename, 'w')
-            file.write(json.dumps(dict))
-            file.close()
-
-        else:
-            threadLock.release()
-            raise cherrypy.HTTPError(400)
-
-        threadLock.release()
-
-    def DELETE(self, *uri, **params):
-
-        threadLock.acquire()
+                self.threadLock.release()
+                return "Error"
 
         try:
-            ID = params['ID']
+            dict['users'].append({'ID': data['ID'],
+                                'nickname': data['nickname'],
+                                'chat_id': data['chat_id']})
+            file = open(self.filename, 'w')
+            file.write(json.dumps(dict))
+            file.close()
+            self.threadLock.release()
+            return "Registration done"
         except:
-            threadLock.release()
-            raise cherrypy.HTTPError(400)
+            self.threadLock.release()
+            return "Error"
 
-        file = open(filename, 'r')
+    def deleteterrarium(self, ID):
+
+        self.threadLock.acquire()
+
+        print "Deleting terrarium"
+        file = open(self.filename, 'r')
         dict = json.loads(file.read())
         file.close()
 
-        # /device/ -> delete a device
-        if uri[0] == 'device':
-            if uri[1] == 'terrarium':
-                for device in dict['terraria']:
-                    if device['ID'] == ID:
-                        dict['terraria'].remove(device)
-                        file = open(filename, 'w')
-                        file.write(json.dumps(dict))
-                        file.close()
-                        break
+        for device in dict['terraria']:
+            if device['ID'] == ID:
+                dict['terraria'].remove(device)
+                file = open(self.filename, 'w')
+                file.write(json.dumps(dict))
+                file.close()
+                break
 
-            elif uri[1] == 'tempcontrol':
-                for device in dict['temp_controls']:
-                    if device['ID'] == ID:
-                        dict['temp_controls'].remove(device)
-                        file = open(filename, 'w')
-                        file.write(json.dumps(dict))
-                        file.close()
-                        break
+        self.threadLock.release()
 
-            elif uri[1] == 'lightcontrol':
-                for device in dict['light_controls']:
-                    if device['ID'] == ID:
-                        dict['light_controls'].remove(device)
-                        file = open(filename, 'w')
-                        file.write(json.dumps(dict))
-                        file.close()
-                        break
+    def deletetempcontrol(self, ID):
 
-            else:
-                threadLock.release()
-                raise cherrypy.HTTPError(400)
+        self.threadLock.acquire()
 
-        # /user/ -> delete a user
-        elif uri[0] == 'user':
-            for user in dict['users']:
-                if user['ID'] == ID:
-                    dict['users'].remove(user)
-                    file = open(filename, 'w')
-                    file.write(json.dumps(dict))
-                    file.close()
-                    break
+        file = open(self.filename, 'r')
+        dict = json.loads(file.read())
+        file.close()
 
-        else:
-            threadLock.release()
-            raise cherrypy.HTTPError(400)
+        for device in dict['temp_controls']:
+            if device['ID'] == ID:
+                dict['temp_controls'].remove(device)
+                file = open(self.filename, 'w')
+                file.write(json.dumps(dict))
+                file.close()
+                break
 
-        threadLock.release()
+        self.threadLock.release()
 
 
-## Thread to delete old devices
+    def deletelightcontrol(self, ID):
+
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
+        dict = json.loads(file.read())
+        file.close()
+
+        for device in dict['light_controls']:
+            if device['ID'] == ID:
+                dict['light_controls'].remove(device)
+                file = open(self.filename, 'w')
+                file.write(json.dumps(dict))
+                file.close()
+                break
+
+        self.threadLock.release()
+
+
+    def deleteuser(self, ID):
+
+        self.threadLock.acquire()
+
+        file = open(self.filename, 'r')
+        dict = json.loads(file.read())
+        file.close()
+
+        for user in dict['users']:
+            if user['ID'] == ID:
+                dict['users'].remove(user)
+                file = open(self.filename, 'w')
+                file.write(json.dumps(dict))
+                file.close()
+                break
+
+        self.threadLock.release()
+
+
+## Thread to delete devices older than half an hour
 class DeleteDevice(threading.Thread):
 
-    def __init__(self):
+    def __init__(self, catalog):
         threading.Thread.__init__(self)
+        self.catalog = catalog
 
     def run(self):
         while True:
 
-            file = open(filename, 'r')
+            self.catalog.threadLock.acquire()
+            file = open(self.catalog.filename, 'r')
             dict = json.loads(file.read())
             file.close()
+            self.catalog.threadLock.release()
 
             for device in dict['terraria']:
-                if time.time() - device['insert-timestamp'] > 1800:
-                    URL = 'http://localhost:8080/device/terrarium'
-                    params = {'ID': device['ID']}
-                    try:
-            			r = requests.delete(URL, params = params)
-            			r.raise_for_status()
-                    except requests.HTTPError as err:
-                        print err
+                if time.time() - device['insert-timestamp'] > 30*60:
+                    self.catalog.deleteterrarium(device['ID'])
 
             for device in dict['temp_controls']:
-                if time.time() - device['insert-timestamp'] > 1800:
-                    URL = 'http://localhost:8080/device/tempcontrol'
-                    params = {'ID': device['ID']}
-                    try:
-            			r = requests.delete(URL, params = params)
-            			r.raise_for_status()
-                    except requests.HTTPError as err:
-                        print err
+                if time.time() - device['insert-timestamp'] > 30*60:
+                    self.catalog.deletetempcontrol(device['ID'])
 
             for device in dict['light_controls']:
-                if time.time() - device['insert-timestamp'] > 1800:
-                    URL = 'http://localhost:8080/device/lightcontrol'
-                    params = {'ID': device['ID']}
-                    try:
-            			r = requests.delete(URL, params = params)
-            			r.raise_for_status()
-                    except requests.HTTPError as err:
-                        print err
+                if time.time() - device['insert-timestamp'] > 30*60:
+                    self.catalog.deletelightcontrol(device['ID'])
 
-
-            time.sleep(120)
-
-
-if __name__ == '__main__':
-	conf = {
-		'/': {
-		'request.dispatch': cherrypy.dispatch.MethodDispatcher(),
-		'tools.sessions.on': True,
-	}
-}
-
-cherrypy.tree.mount (RESTCatalog(), '/', conf)
-cherrypy.config.update({'server.socket_host': '0.0.0.0'})
-cherrypy.config.update({'server.socket_port': 8080})
-cherrypy.engine.start()
-
-deletedevice = DeleteDevice()
-deletedevice.start()
+            time.sleep(10)
