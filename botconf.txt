@@ -1,0 +1,1 @@
+{"catalog_IP": "localhost", "catalog_port": 8080, "token": "764375532:AAG-BVix1eUI9yoeUJKdkCXUeBmi7arYZ3M"}
