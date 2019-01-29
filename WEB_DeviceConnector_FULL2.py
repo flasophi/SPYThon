@@ -161,10 +161,10 @@ class MQTT_DeviceConnector:
 	def myOnMessageReceived (self, paho_mqtt , userdata, msg):
 		# A new message is received 
 	    print (msg.topic, msg.payload)
-	    print msg.topic
-	    print msg.payload
-	    print "-"
-	    print "-"
+	    #print msg.topic
+	    #print msg.payload
+	    #print "-"
+	    #print "-"
 		
         #payload deve essere un senml, nel campo "v" c' il
         #valore atteso (1 acceso, 0 spento)
@@ -193,7 +193,7 @@ class MQTT_DeviceConnector:
 	
 		#print ("publishing '%s' with topic '%s'" % (msg, topic))
 		# publish a message with a certain topic
-		self._paho_mqtt.publish(topic, msg, 2)
+		self._paho_mqtt.publish(topic, json.dumps(msg) , 2)
 
 	def mySubscribe (self, topic):
 		# if needed, you can do some computation or error-check before subscribing
@@ -237,7 +237,7 @@ class Registration(threading.Thread):
 			s.connect(("8.8.8.8", 80))
 			ip = s.getsockname()[0]
 			
-			
+			myport=8080
 			catalogIP = self.conf_file_dict['catalogIP']
 			deviceID = self.conf_file_dict['deviceID']
 
@@ -249,7 +249,7 @@ class Registration(threading.Thread):
 			pub_topics = [initstring + "/temperature", initstring + "/humidity", initstring + "/light_status", initstring + "/lock_status"]
 			resources = ["temperature", "humidity", "lock_status","light_status", "photo", "Tcontrol", "Lcontrol"]
 	
-			payload = {'ID': deviceID, 'IP': ip , 'GET': get , 'POST' : [] , 'sub_topics':sub_topics, 'pub_topics': pub_topics, 'resources': resources}
+			payload = {'ID': deviceID, 'IP': ip ,'port':myport, 'GET': get , 'POST' : [] , 'sub_topics':sub_topics, 'pub_topics': pub_topics, 'resources': resources}
 	
 			try:
 				r1 = requests.post('http://'+ catalogIP + ':8080/add_device/terrarium' , data = json.dumps(payload)  )
@@ -326,7 +326,8 @@ if __name__ == "__main__":
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	s.connect(("8.8.8.8", 80))
 	ip = s.getsockname()[0]
-	 
+	
+	myport= 8080
 	deviceconnector = DeviceConnector(ip) 
 
 	conf_file = open("config.txt", 'r')
@@ -344,7 +345,7 @@ if __name__ == "__main__":
 	pub_topics = [initstring + "/temperature", initstring + "/humidity", initstring + "/light_status", initstring + "/lock_status"]
 	resources = ["temperature", "humidity", "lock_status","light_status", "photo", "Tcontrol", "Lcontrol"]
 	
-	payload = {'ID': deviceID, 'IP': ip , 'GET': get , 'POST' : [] , 'sub_topics':sub_topics, 'pub_topics': pub_topics, 'resources': resources}
+	payload = {'ID': deviceID, 'IP': ip , 'port': myport, 'GET': get , 'POST' : [] , 'sub_topics':sub_topics, 'pub_topics': pub_topics, 'resources': resources}
 	
 	try:
 		r1 = requests.post('http://'+ catalogIP + ':8080/add_device/terrarium' , data = json.dumps(payload)  )

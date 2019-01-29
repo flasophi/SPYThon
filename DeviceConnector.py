@@ -131,9 +131,9 @@ class DeviceConnector:
 
 		if GPIO.input(self.pin_light) == True :
 		
-			Light_senml= {'bn': "http://" + self.ip + '/Light_sensor/', 'e': [{ "n": "light_status", "u": "state","t": time.time(), "v": "ON"}]}
+			Light_senml= {'bn': "http://" + self.ip + '/Light_sensor/', 'e': [{ "n": "light_status", "u": "state","t": time.time(), "v": 1}]}
 		else:	
-			Light_senml= {'bn': "http://" + self.ip + '/Light_sensor/', 'e': [{ "n": "light_status", "u": "state","t": time.time(), "v": "OFF"}]}
+			Light_senml= {'bn': "http://" + self.ip + '/Light_sensor/', 'e': [{ "n": "light_status", "u": "state","t": time.time(), "v": 0}]}
 		
 		GPIO.cleanup(self.pin_light)
 		print Light_senml
@@ -197,7 +197,7 @@ class DeviceConnector:
 	
 		 self.humidityalert = alert
 		 print alert
-		 print "
+		 
 		 
 		 
 	
