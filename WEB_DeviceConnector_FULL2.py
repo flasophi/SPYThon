@@ -14,25 +14,15 @@ from DeviceConnector import *
 
 import threading
 
+
+
+
 #POSSIBILITIES   REST-ful
 # localhost:8080/temperature
 # localhost:8080/humidity      <-- oltre a mandare hum, ti informo con {h:val, alert:boolean}
 # localhost:8080/lock_status   
 # localhost:8080/light_status  <-- fake 
 # localhost:8080/photo         <-- fake (3 foto)
-
-
-
-
-# RICORDA : fai la init dove comunichi al caltalogue il mio ip
-# id_device :"ID", IP,GET [temperature, humidity, loc,..], POST [],lista topic [] 
- 
- #DA fare: 1 solo device connector per MQTT e RESTFUL
- 
- 
-
-
-
 
 
 class REST_DeviceConnector:
@@ -47,8 +37,7 @@ class REST_DeviceConnector:
     def GET (self, *uri):
                             
             if (uri[0] == 'temperature'):
-                    
-                    
+                                        
                     senml = self.deviceconnector.temperature()
             
                     if senml is None:
@@ -93,6 +82,7 @@ class REST_DeviceConnector:
                             
                     else: 
                             out = json.dumps(senml)
+                            
                     
             elif (uri [0] == 'light_status'):
                     
@@ -166,27 +156,31 @@ class MQTT_DeviceConnector:
 	    #print "-"
 	    #print "-"
 		
-        #payload deve essere un senml, nel campo "v" c' il
+		
+		
+		
+        #payload deve essere un senml, nel campo "v" c'e il
         #valore atteso (1 acceso, 0 spento)
 	    
 	    
 	    msg_dict = json.loads(str(msg.payload))
         # mi arriva il json con il controllo se 1 o 0
-            if (msg.topic == 'SPYthon/'+ self.deviceID +"/Tcontrol"):
+            if (msg.topic == '/SPYthon/'+ self.deviceID +"/Tcontrol"):
                             
-                control = ((msg_dict['e'])[0])['v']
+                control = msg_dict['v']
                 
                 self.deviceconnector.Tcontrol(int(control))
             
-            elif (msg.topic =='SPYthon/'+ self.deviceID +"/Lcontrol"):
-                control = ((msg_dict['e'])[0])['v']
+            elif (msg.topic =='/SPYthon/'+ self.deviceID +"/Lcontrol"):
+                control = msg_dict['v']
                
                 self.deviceconnector.Lcontrol(control)
                     
-            elif (msg.topic == 'SPYthon/'+ self.deviceID +"/Halert"):
+            elif (msg.topic == '/SPYthon/'+ self.deviceID +"/Halert"):
                 alert = msg_dict['v']
                 print alert
                 self.deviceconnector.Halert(alert)
+                
 
 
 	def myPublish (self, topic, msg):
@@ -241,7 +235,7 @@ class Registration(threading.Thread):
 			catalogIP = self.conf_file_dict['catalogIP']
 			deviceID = self.conf_file_dict['deviceID']
 
-			initstring = "SPYthon/" + deviceID
+			initstring = "/SPYthon/" + deviceID
 	
 			#DEVICE registration  
 			get = ["temperature", "humidity", "lock_status","light_status", "photo"]    
@@ -278,7 +272,7 @@ class Temp(threading.Thread):
  	def run(self):
  		while True:
                         senml_temp = self.deviceconnector.temperature()
-			self.pub.myPublish('SPYthon/'+ deviceID + '/temperature', json.dumps(senml_temp))
+			self.pub.myPublish('/SPYthon/'+ deviceID + '/temperature', json.dumps(senml_temp))
  			time.sleep(15)
 
 class Hum(threading.Thread):
@@ -290,7 +284,7 @@ class Hum(threading.Thread):
  	def run(self):
  		while True:
                         senml_hum = self.deviceconnector.humidity()
-			self.pub.myPublish('SPYthon/'+ deviceID +'/humidity', json.dumps(senml_hum))
+			self.pub.myPublish('/SPYthon/'+ deviceID +'/humidity', json.dumps(senml_hum))
  			time.sleep(30)
 
 		
@@ -304,7 +298,7 @@ class Light(threading.Thread):
 	def run(self):
 		while True: 
                         light = self.deviceconnector.light_status()
-			self.pub.myPublish('SPYthon/'+ deviceID +'/light_status', json.dumps(light))
+			self.pub.myPublish('/SPYthon/'+ deviceID +'/light_status', json.dumps(light))
                         time.sleep(45)
 			
 class Lock(threading.Thread):
@@ -316,7 +310,7 @@ class Lock(threading.Thread):
  	def run(self):
  		while True:
                         lockStatus = self.deviceconnector.lock_status()
-			self.pub.myPublish('SPYthon/'+ deviceID +'/lock_status', json.dumps(lockStatus))
+			self.pub.myPublish('/SPYthon/'+ deviceID +'/lock_status', json.dumps(lockStatus))
  			time.sleep(60)
 
 			
@@ -337,7 +331,7 @@ if __name__ == "__main__":
 	catalogIP = conf_file_dict['catalogIP']
 	deviceID = conf_file_dict['deviceID']
 
-	initstring = "SPYthon/" + deviceID
+	initstring = "/SPYthon/" + deviceID
 	
 	#DEVICE registration  
 	get = ["temperature", "humidity", "lock_status","light_status", "photo"]    
@@ -363,6 +357,8 @@ if __name__ == "__main__":
             sys.exit()
 		
 	
+	
+	
 	conf = {
 	    '/': {
 	    'request.dispatch': cherrypy.dispatch.MethodDispatcher(),
@@ -374,17 +370,12 @@ if __name__ == "__main__":
             'tools.staticdir.dir': '.'
         }
     }
-	cherrypy.tree.mount(REST_DeviceConnector(deviceconnector) , '/', conf)
-	cherrypy.config.update({'server.socket_host': '0.0.0.0'})
-	cherrypy.config.update({'server.socket_port': 8080})
-	cherrypy.engine.start()
+
 		
 		
 		
 	test = MQTT_DeviceConnector('MQTT_DeviceConnector', deviceID, brokerip, brokerport, deviceconnector)
 	
-		
-		
 		
 	Registration = Registration(deviceconnector,conf_file_dict)	
 	Temperature= Temp(test,deviceconnector,deviceID)
@@ -394,6 +385,7 @@ if __name__ == "__main__":
 	
 	
 	test.start()
+	
 	test.mySubscribe(initstring + '/Tcontrol')
         test.mySubscribe(initstring + '/Lcontrol')
 	test.mySubscribe(initstring + '/Halert')
@@ -408,28 +400,16 @@ if __name__ == "__main__":
 	Lock_status.start()
 	
 	
+	
+	
+	cherrypy.tree.mount(REST_DeviceConnector(deviceconnector) , '/', conf)
+	cherrypy.config.update({'server.socket_host': '0.0.0.0'})
+	cherrypy.config.update({'server.socket_port': 8080})
+	cherrypy.engine.start()
+	cherrypy.engine.block()
 		
 		
-	# #qui come broker devo ottener l'ip del broker
-	# test.start()
 
-	# temp = Temp(test,deviceconnector)
-	# hum = Hum(test,deviceconnector)
-	# light_status = Light(test,deviceconnector)
-    # lock_status = Lock(test,deviceconnector)
-
-
-	# temp.start()
-	# hum.start()
-	# light_status.start()
-	# lock_status.start()
-
-	# test.mySubscribe(str(test.broker)+'/Tcontrol')
-    # test.mySubscribe(str(test.broker)+'/Lcontrol')
-	# test.mySubscribe(str(test.broker)+'/Halert')
-
-	#while True:
-	#	pass
 
 
 	
