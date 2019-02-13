@@ -1,0 +1,6 @@
+{
+"catalogip": "192.168.1.122",
+ "catalogport": ":8080/",
+ "terrariumID": "nagini",
+ "hum_ref": 62.5
+}

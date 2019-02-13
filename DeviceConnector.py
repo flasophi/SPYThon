@@ -88,9 +88,9 @@ class DeviceConnector:
 		
 		if temperature is not None:
 		
-			T_senml = {'bn': "http://" + self.ip + '/Tsensor/', 'e': [{ "n": "temperature", "u": "Cel","t": time.time(), "v": temperature}]}
+			T_senml = {"bn": "http://" + self.ip + "/Tsensor/", "e": [{ "n": "temperature", "u": "Celsius","t": time.time(), "v": temperature}]}
 		else:	
-			T_senml = {'bn': "http://" + self.ip + '/Tsensor/', 'e': [{ "n": "temperature", "u": "Cel","t": time.time(), "v": "Error in reading"}]}
+			T_senml = {"bn": "http://" + self.ip + "/Tsensor/", "e": [{ "n": "temperature", "u": "Celsius","t": time.time(), "v": "Error in reading"}]}
 		
 		print T_senml
 		return T_senml
@@ -101,9 +101,9 @@ class DeviceConnector:
 		
 		if humidity is not None:
 		
-			H_senml= {'bn': "http://" + self.ip + '/Hsensor/', 'e': [{ "n": "humidity", "u": "%","t": time.time(), "v": humidity} , { "n": "alert", "u": "none","t": time.time(), "v": self.humidityalert}]}
+			H_senml= {"bn": "http://" + self.ip + "/Hsensor/", "e": [{ "n": "humidity", "u": "%","t": time.time(), "v": humidity} , { "n": "alert", "u": "none","t": time.time(), "v": self.humidityalert}]}
 		else:	
-			H_senml= {'bn': "http://" + self.ip + '/Hsensor/', 'e': [{ "n": "humidity", "u": "%","t": time.time(), "v": "Error in reading"},  { "n": "alert", "u": "none","t": time.time(), "v": self.humidityalert}]}
+			H_senml= {"bn": "http://" + self.ip + "/Hsensor/", "e": [{ "n": "humidity", "u": "%","t": time.time(), "v": "Error in reading"},  { "n": "alert", "u": "none","t": time.time(), "v": self.humidityalert}]}
 		
 		print H_senml
 		return H_senml
@@ -116,9 +116,9 @@ class DeviceConnector:
 	
 		if GPIO.input(self.pin_lock) == True :
 		
-			Lock_senml= {'bn': "http://" + self.ip + '/Lock_sensor/', 'e': [{ "n": "lock_status", "u": "state","t": time.time(), "v": "closed"}]}
+			Lock_senml= {"bn": "http://" + self.ip + "/Lock_sensor/", "e": [{ "n": "lock_status", "u": "state","t": time.time(), "v": "closed"}]}
 		else:	
-			Lock_senml= {'bn': "http://" + self.ip + '/Lock_sensor/', 'e': [{ "n": "lock_status", "u": "state","t": time.time(), "v": "open"}]}
+			Lock_senml= {"bn": "http://" + self.ip + "/Lock_sensor/", "e": [{ "n": "lock_status", "u": "state","t": time.time(), "v": "open"}]}
 		
 		GPIO.cleanup(self.pin_lock)
 		
@@ -131,9 +131,9 @@ class DeviceConnector:
 
 		if GPIO.input(self.pin_light) == True :
 		
-			Light_senml= {'bn': "http://" + self.ip + '/Light_sensor/', 'e': [{ "n": "light_status", "u": "state","t": time.time(), "v": "ON"}]}
+			Light_senml= {"bn": "http://" + self.ip + "/Light_sensor/", "e": [{ "n": "light_status", "u": "state","t": time.time(), "v": 1}]}
 		else:	
-			Light_senml= {'bn': "http://" + self.ip + '/Light_sensor/', 'e': [{ "n": "light_status", "u": "state","t": time.time(), "v": "OFF"}]}
+			Light_senml= {"bn": "http://" + self.ip + "/Light_sensor/", "e": [{ "n": "light_status", "u": "state","t": time.time(), "v": 0}]}
 		
 		GPIO.cleanup(self.pin_light)
 		print Light_senml
@@ -185,6 +185,7 @@ class DeviceConnector:
 		if int(control ) == 1:
 			
 			c1.switch_on()
+			print "LUCE ACCESAAAAAAAAAAAAAAAAAAAA"
 
 		else: 
 
@@ -197,7 +198,7 @@ class DeviceConnector:
 	
 		 self.humidityalert = alert
 		 print alert
-		 print "
+		 
 		 
 		 
 	
