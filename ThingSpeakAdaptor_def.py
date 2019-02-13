@@ -105,30 +105,25 @@ class PowerConsumptioneEstimate:
         return self.energyLight+self.energyHeat+ self.eRPi
     
 class EnergyThread(threading.Thread):
-    def __init__ (self, pEstimate):
-        threading.Thread.__init__(self)
-        self.pEstimate = pEstimate
-        self.now = datetime.datetime.now()
-    def run (self):
-        while True:
-            actualMonth = datetime.datetime.now()
-            actualMonth = actualMonth.month
-            if (self.now != actualMonth):
-                payload = {"api_key" : "9N2P4LUVSZOE63MN"}
-                r = requests.delete("https://api.thingspeak.com/channels/702275/feeds.json", data = payload)
-                print "data cleared"
-            value = self.pEstimate.sumContributes()
-            data = urllib.urlopen("https://api.thingspeak.com/update?api_key=KUSHZ7LZ6SJ96C4X&field1="+str(value))
-            print
-			print "data published"
-            print value
-			print
-            time.sleep(60)
-
-
+	def __init__ (self, pEstimate):
+		threading.Thread.__init__(self)
+		self.pEstimate = pEstimate
+		self.now = datetime.datetime.now().month
+	def run (self):
+		while True:
+			actualMonth = datetime.datetime.now().month
+			if (self.now != actualMonth):
+				payload = {"api_key" : "9N2P4LUVSZOE63MN"}
+				r = requests.delete("https://api.thingspeak.com/channels/702275/feeds.json", data = payload)
+				print "data cleared"
+			value = self.pEstimate.sumContributes()
+			data = urllib.urlopen("https://api.thingspeak.com/update?api_key=KUSHZ7LZ6SJ96C4X&field1="+str(value))            
+			print "data published: " + str(value)
+			time.sleep(60)
+			
 if __name__ == "__main__":
 
-    conf_file = open("config.txt", 'r')
+    conf_file = open("configControl.txt", 'r')
     conf_file_dict = json.loads(conf_file.read())
     conf_file.close()
     deviceID = conf_file_dict['terrariumID']
