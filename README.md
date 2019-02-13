@@ -1,4 +1,5 @@
 # SPYThon
 
-Benvenuti nel più avanzato sistema per spiare e tenere al caldo il vostro pitone.
+Programming for IoT Applications 2018-2019
+Acerbo, Ferrari, Finocchio, Minervini
 
