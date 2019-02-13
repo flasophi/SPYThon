@@ -84,13 +84,16 @@ class RESTCatalog:
             try:
                 IDUser = params['IDUs']
                 IDTerr = params['IDTerr']
+                password = params['pws']
             except:
                 raise cherrypy.HTTPError(400)
 
-            out = self.catalog.associate(IDUser, IDTerr)
+            out = self.catalog.associate(IDUser, IDTerr, password)
 
             if out == "Error":
                 raise cherrypy.HTTPError(404)
+            if out == "password incorrect":
+                raise cherrypy.HTTPError(401)
 
         elif uri[0] == 'changetemp':
             try:
@@ -105,7 +108,7 @@ class RESTCatalog:
                 raise cherrypy.HTTPError(404)
             else:
                 try:
-                    r = requests.get('http://' + ip + ':' + port + '/temperature', params = {'temp': temp})
+                    r = requests.get('http://' + ip + ':' + str(port) + '/temperature', params = {'temp': temp})
                     r.raise_for_status()
                 except requests.HTTPError as err:
                     raise cherrypy.HTTPError(500)
@@ -126,7 +129,7 @@ class RESTCatalog:
                 raise cherrypy.HTTPError(404)
             else:
                 try:
-                    r = requests.get('http://' + ip + ':' + port + '/light/', params = {'dawn': dawn, 'dusk': dusk})
+                    r = requests.get('http://' + ip + ':' + str(port) + '/light/', params = {'dawn': dawn, 'dusk': dusk})
                     r.raise_for_status()
                 except requests.HTTPError as err:
                     raise cherrypy.HTTPError(500)
@@ -138,6 +141,7 @@ class RESTCatalog:
 
         if len(uri) == 0:
             raise cherrypy.HTTPError(400)
+
         mybody = cherrypy.request.body.read()
 
         try:

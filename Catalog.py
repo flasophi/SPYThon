@@ -1,5 +1,6 @@
 import threading
 import time
+import json
 
 # CATALOG. It implements a catalog with the following entries:
 # broker_IP, broker_port, terraria, temperature controls (temp_controls), light_controls, users
@@ -9,7 +10,7 @@ import time
 # terraria are identified by: ID, IP, GET, POST, sub_topics, pub_topics, resources, user (ID of the associated user, None if not already associated), insert-timestamp
 # temperature controls are identified by: ID, IP, GET, POST, sub_topics, pub_topics, temp, terrarium (ID of the associated terrarium), insert-timestamp
 # light controls are identified by: ID, IP, GET, POST, sub_topics, pub_topics, dawn, dusk, terrarium (ID of the associated terrarium), insert-timestamp
-# users are identified by an ID, given by the bot, a nickname (the one on Telegram), and by the chat_id to send messages on Telegram.
+# users are identified by a nickname (the one on Telegram) and by the chat_id to send messages on Telegram.
 
 class Catalog:
 
@@ -100,7 +101,7 @@ class Catalog:
                 return json.dumps(user)
         return "User not found"
 
-    def associate(self, IDUser, IDTerr):
+    def associate(self, IDUser, IDTerr, password):
 
         self.threadLock.acquire()
 
@@ -122,6 +123,8 @@ class Catalog:
 
         for terr in dict['terraria']:
             if terr['ID'] == IDTerr:
+                if terr['pws'] != password:
+                    return "password incorrect"
                 terr['user'] = IDUser
                 file = open(self.filename, 'w')
                 file.write(json.dumps(dict))
@@ -164,9 +167,14 @@ class Catalog:
 
         self.threadLock.acquire()
 
+        file = open(self.filename, 'r')
+        json_file = file.read()
+        dict = json.loads(json_file)
+        file.close()
+
         for ctrl in dict['light_controls']:
 
-            if ctrl['terrarium'] == params['IDTerr']:
+            if ctrl['terrarium'] == IDTerr:
 
                 if dawn != 'null':
                     ctrl['dawn'] = dawn
@@ -205,6 +213,7 @@ class Catalog:
                     device['sub_topics'] = data['sub_topics']
                     device['pub_topics'] = data['pub_topics']
                     device['resources'] = data['resources']
+                    device['pws'] = data['psw']
                     device['insert-timestamp'] = time.time()
                     file = open(self.filename, 'w')
                     file.write(json.dumps(dict))
@@ -224,6 +233,7 @@ class Catalog:
                                 'sub_topics': data['sub_topics'],
                                 'pub_topics': data['pub_topics'],
                                 'resources': data['resources'],
+                                'pws': data['psw'],
                                 'user': None,
                                 'insert-timestamp': time.time()})
 
@@ -353,9 +363,8 @@ class Catalog:
 
         for user in dict['users']:
             try:
-                if user['ID'] == data['ID']:
+                if user['ID'] == str(data['ID']):
                     user['nickname'] = data['nickname']
-                    user['chat_id'] = data['chat_id']
                     file = open(self.filename, 'w')
                     file.write(json.dumps(dict))
                     file.close()
@@ -366,9 +375,8 @@ class Catalog:
                 return "Error"
 
         try:
-            dict['users'].append({'ID': data['ID'],
-                                'nickname': data['nickname'],
-                                'chat_id': data['chat_id']})
+            dict['users'].append({'ID': str(data['ID']),
+                                'nickname': data['nickname']})
             file = open(self.filename, 'w')
             file.write(json.dumps(dict))
             file.close()
@@ -443,13 +451,18 @@ class Catalog:
         dict = json.loads(file.read())
         file.close()
 
+        for terrarium in dict['terraria']:
+            if terrarium['user'] == ID:
+                terrarium['user'] = None
+
         for user in dict['users']:
             if user['ID'] == ID:
                 dict['users'].remove(user)
-                file = open(self.filename, 'w')
-                file.write(json.dumps(dict))
-                file.close()
                 break
+
+        file = open(self.filename, 'w')
+        file.write(json.dumps(dict))
+        file.close()
 
         self.threadLock.release()
 
