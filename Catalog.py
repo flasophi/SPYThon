@@ -148,10 +148,7 @@ class Catalog:
         for ctrl in dict['temp_controls']:
 
             if ctrl['terrarium'] == IDTerr:
-                if temp != 'null':
-                    ctrl['temp'] = temp
-                else:
-                    ctrl['temp'] = None
+                ctrl['temp'] = temp
 
                 file = open(self.filename, 'w')
                 file.write(json.dumps(dict))
@@ -176,17 +173,14 @@ class Catalog:
 
             if ctrl['terrarium'] == IDTerr:
 
-                if dawn != 'null':
-                    ctrl['dawn'] = dawn
-                    ctrl['dusk'] = dusk
-                else:
-                    ctrl['dawn'] = None
-                    ctrl['dusk'] = None
+                ctrl['dawn'] = dawn
+                ctrl['dusk'] = dusk
 
                 file = open(self.filename, 'w')
                 file.write(json.dumps(dict))
                 file.close()
                 self.threadLock.release()
+
                 return ctrl['IP'], ctrl['port']
 
         # if the control for that terrarium is not found

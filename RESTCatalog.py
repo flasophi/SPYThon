@@ -102,6 +102,9 @@ class RESTCatalog:
             except:
                 raise cherrypy.HTTPError(400)
 
+            if temp == 'null':
+                temp = None
+
             ip, port = self.catalog.changetemp(IDTerr, temp)
 
             if ip == "Error":
@@ -112,8 +115,7 @@ class RESTCatalog:
                     r.raise_for_status()
                 except requests.HTTPError as err:
                     raise cherrypy.HTTPError(500)
-                    print err
-
+                    self.catalog.changetemp(IDTerr, None)
 
         elif uri[0] == 'changelightcycle':
             try:
@@ -122,6 +124,10 @@ class RESTCatalog:
                 dusk = params['dusk']
             except:
                 raise cherrypy.HTTPError(400, 'Incorrect request format')
+
+            if dawn == 'null':
+                dawn = None
+                dusk = None
 
             ip, port = self.catalog.changelightcycle(IDTerr, dawn, dusk)
 
@@ -133,7 +139,7 @@ class RESTCatalog:
                     r.raise_for_status()
                 except requests.HTTPError as err:
                     raise cherrypy.HTTPError(500)
-                    print err
+                    self.catalog.changelightcycle(IDTerr, None, None)
         else:
             raise cherrypy.HTTPError(400, 'Incorrect request format')
 
