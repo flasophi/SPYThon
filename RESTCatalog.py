@@ -140,6 +140,13 @@ class RESTCatalog:
                 except requests.HTTPError as err:
                     raise cherrypy.HTTPError(500)
                     self.catalog.changelightcycle(IDTerr, None, None)
+
+        elif uri[0] == "delete_user":
+            try:
+                self.catalog.deleteuser(params['UserID'])
+            except:
+                raise cherrypy.HTTPError(400, 'Incorrect request format')
+        
         else:
             raise cherrypy.HTTPError(400, 'Incorrect request format')
 

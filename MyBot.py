@@ -61,6 +61,22 @@ class MyBot:
                 self.bot.sendMessage(chat_id, "Congratulations " + name +
                                     "! You have been registered. You can now connect yourself to your reptile.")
 
+            elif command == '/deletemyself':
+
+                URL = 'http://' + self.catalogIP + ':' + self.catalogport + '/delete_user'
+                try:
+                    r = requests.get(URL, params = {'UserID': chat_id})
+                    r.raise_for_status()
+                except requests.HTTPError as err:
+                    self.bot.sendMessage(chat_id, 'An error happened. Try again.')
+                    print err
+                    return
+
+                self.bot.sendMessage(chat_id, "Hey " + name +
+                                    "! It's sad to see you leave. Come back soon!")
+
+
+
 
 
             elif command.startswith('/registerterrarium'):  # Associate a terrarium (identified by its ID)
