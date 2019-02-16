@@ -6,10 +6,11 @@ import json
 # broker_IP, broker_port, terraria, temperature controls (temp_controls), light_controls, users
 # the catalog is initalized by reading the first version of the catalog json file
 # each access to the json file is protected against multi-threading by a Lock
-# a thread is automatically activated to delete devices (terraria and controls) which are not updated for more than 30 minutes, to prevent requests to wrong IP
-# terraria are identified by: ID, IP, GET, POST, sub_topics, pub_topics, resources, user (ID of the associated user, None if not already associated), insert-timestamp
-# temperature controls are identified by: ID, IP, GET, POST, sub_topics, pub_topics, temp, terrarium (ID of the associated terrarium), insert-timestamp
-# light controls are identified by: ID, IP, GET, POST, sub_topics, pub_topics, dawn, dusk, terrarium (ID of the associated terrarium), insert-timestamp
+# a thread is automatically activated to delete devices (terraria and controls) which are not updated for more than 30 minutes,
+# to prevent requests to wrong IP
+# terraria are identified by: ID, password, IP, port, GET, POST, sub_topics, pub_topics, resources, user (ID of the associated user, None if not already associated), insert-timestamp
+# temperature controls are identified by: ID, IP, port, GET, POST, sub_topics, pub_topics, temp, terrarium (ID of the associated terrarium), insert-timestamp
+# light controls are identified by: ID, IP, port, GET, POST, sub_topics, pub_topics, dawn, dusk, terrarium (ID of the associated terrarium), insert-timestamp
 # users are identified by a nickname (the one on Telegram) and by the chat_id to send messages on Telegram.
 
 class Catalog:
@@ -18,17 +19,17 @@ class Catalog:
 
         self.filename = filename
 
-        file = open(self.filename, 'r')
-        dict_old = json.loads(file.read())
-        file.close()
+        #file = open(self.filename, 'r')
+        #dict_old = json.loads(file.read())
+        #file.close()
 
-        dict_new = {'broker_IP': dict_old['broker_IP'], 'broker_port': dict_old['broker_port'],
-                'terraria': dict_old['terraria'], 'temp_controls': dict_old['temp_controls'], 'light_controls': dict_old['light_controls'],
-                'users': dict_old['users'] }
+        #dict_new = {'broker_IP': dict_old['broker_IP'], 'broker_port': dict_old['broker_port'],
+        #        'terraria': dict_old['terraria'], 'temp_controls': dict_old['temp_controls'], 'light_controls': dict_old['light_controls'],
+        #        'users': dict_old['users'] }
 
-        file = open(self.filename, 'w')
-        file.write(json.dumps(dict_new))
-        file.close()
+        #file = open(self.filename, 'w')
+        #file.write(json.dumps(dict_new))
+        #file.close()
 
         self.threadLock = threading.Lock()
 

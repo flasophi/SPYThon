@@ -25,10 +25,11 @@ class MyBot:
         self.catalogIP = dict['catalog_IP']
         self.catalogport = str(dict['catalog_port'])
         self.bot = telepot.Bot(token=str(self.token))
-        telepot.api._pools = {'default': urllib3.PoolManager(num_pools = 3, maxsize = 10, retries = 3, timeout = 30),}
+
         MessageLoop(self.bot, {'chat': self.on_chat_message, 'callback_query': self.on_callback_query}).run_as_thread()
 
     def on_chat_message(self, msg):
+
         content_type, chat_type, chat_id = telepot.glance(msg)
 
         if content_type == 'text':
@@ -59,7 +60,7 @@ class MyBot:
                     return
 
                 self.bot.sendMessage(chat_id, "Congratulations " + name +
-                                    "! You have been registered. You can now connect yourself to your reptile.")
+                                    "! You have been registered. You can now connect to your reptile.")
 
             elif command == '/deletemyself':
 
@@ -74,9 +75,6 @@ class MyBot:
 
                 self.bot.sendMessage(chat_id, "Hey " + name +
                                     "! It's sad to see you leave. Come back soon!")
-
-
-
 
 
             elif command.startswith('/registerterrarium'):  # Associate a terrarium (identified by its ID)
@@ -106,7 +104,6 @@ class MyBot:
                         self.bot.sendMessage(chat_id, 'Password is not correct.')
                     else:
                         self.bot.sendMessage(chat_id, 'An error happened. Try again. (syntax is: /registerterrarium terrariumID password)')
-                    #print err
                     return
 
                 self.bot.sendMessage(chat_id, "Congratulations " + name +
@@ -128,8 +125,7 @@ class MyBot:
                         self.bot.sendMessage(chat_id, "You can't check the terrarium. Please register and associate yourself to the terrarium.")
                         return
                 except requests.HTTPError as err:
-                    self.bot.sendMessage(chat_id, 'An error happened. Try again. (Correct syntax is: /check terrariumID)')
-                    print err
+                    self.bot.sendMessage(chat_id, 'An error happened. Try again and check the connection of the terrarium. (Correct syntax is: /check terrariumID)')
                     return
 
 
@@ -156,7 +152,7 @@ class MyBot:
                         self.bot.sendMessage(chat_id, "You can't control the terrarium. Please associate to the terrarium.")
                         return
                 except requests.HTTPError as err:
-                    self.bot.sendMessage(chat_id, 'An error happened. Try again. (syntax is: /temperature myID terrariumID)')
+                    self.bot.sendMessage(chat_id, 'An error happened. Try again and check the connection of the terrarium. (syntax is: /temperature terrariumID)')
                     return
 
                 self.user_states.append({'user': chat_id, 'state': 'temp', 'terr': terr['ID']})
@@ -177,7 +173,7 @@ class MyBot:
                         self.bot.sendMessage(chat_id, "You can't control the terrarium. Please associate to the terrarium.")
                         return
                 except requests.HTTPError as err:
-                    self.bot.sendMessage(chat_id, 'An error happened. Try again. (syntax is: /light terrariumID)')
+                    self.bot.sendMessage(chat_id, 'An error happened. Try again and check the connection of the terrarium. (syntax is: /light terrariumID)')
                     return
 
                 self.user_states.append({'user': chat_id, 'state': 'light', 'terr': terr['ID']})
@@ -187,6 +183,8 @@ class MyBot:
 
                 send1 = 0
                 send2 = 0
+
+                # check if the user is engaged in a conversation
 
                 for state in self.user_states:
                     if state['user'] == chat_id and state['state'] == 'temp':
@@ -199,6 +197,7 @@ class MyBot:
 
                 # Conversation about reference temperature
                 if send1:
+
                     if msg['text'] == 'STOP':
                         temp = 'null'
                     else:
@@ -214,7 +213,7 @@ class MyBot:
                         r.raise_for_status()
 
                     except requests.HTTPError as err:
-                        self.bot.sendMessage(chat_id, 'An error happened. Try again.')
+                        self.bot.sendMessage(chat_id, 'An error happened. Try again and check the connection of the temperature control.')
                         self.user_states.remove(state)
                         return
 
@@ -259,7 +258,7 @@ class MyBot:
                         r.raise_for_status()
 
                     except requests.HTTPError as err:
-                        self.bot.sendMessage(chat_id, 'An error happened. Try again.')
+                        self.bot.sendMessage(chat_id, 'An error happened. Try again and check the connection of the light control.')
                         self.user_states.remove(state)
                         print err
                         return
@@ -364,7 +363,6 @@ class HumidityAlert(threading.Thread):
                     try:
                         r = requests.get('https://api.telegram.org/bot' + self.mybot.token + '/sendMessage?chat_id='+ terrarium['user'] + '&text=' + 'Hey, the humidity of ' + terrarium['ID'] + ' is not correct. I suggest you to move or fill the water bowl.')
                         r.raise_for_status()
-                    #self.mybot.bot.sendMessage(int(terrarium['user']), 'Hey, the humidity of ' + terrarium['ID'] + ' is not correct. I suggest you to move or fill the water bowl.')
                     except requests.HTTPError as err:
                         print err
 
