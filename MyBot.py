@@ -19,7 +19,7 @@ class MyBot:
         file.close()
 
         # Variables that keep track of a conversation
-        self.user_states = [] # list of dictionaries with {'user': chat_id, 'state': None|temp|light, 'terr': terr_id}
+        self.user_states = [] # list of dictionaries with {'user': chat_id, 'state': temp|light, 'terr': terr_id}
 
         self.token = dict['token']
         self.catalogIP = dict['catalog_IP']
@@ -350,21 +350,22 @@ class HumidityAlert(threading.Thread):
             terraria = r.json()['terraria']
 
             for terrarium in terraria:
-                URL_terr = 'http://' + terrarium['IP'] + ':' + str(terrarium['port'])
-                #print URL_terr
-                try:
-                    r = requests.get(URL_terr + '/humidity')
-                    r.raise_for_status()
-                except requests.HTTPError as err:
-                    #print err
-                    continue
-                alert = (((r.json())['e'])[1])['v']
-                if alert == 1:
+                if terrarium['user'] != None:
+                    URL_terr = 'http://' + terrarium['IP'] + ':' + str(terrarium['port'])
                     try:
-                        r = requests.get('https://api.telegram.org/bot' + self.mybot.token + '/sendMessage?chat_id='+ terrarium['user'] + '&text=' + 'Hey, the humidity of ' + terrarium['ID'] + ' is not correct. I suggest you to move or fill the water bowl.')
+                        r = requests.get(URL_terr + '/humidity')
                         r.raise_for_status()
                     except requests.HTTPError as err:
-                        print err
+                        #print err
+                        continue
+                    alert = (((r.json())['e'])[1])['v']
+                    if alert == 1:
+                        try:
+                            #print 'Sending humidity alert'
+                            r = requests.get('https://api.telegram.org/bot' + self.mybot.token + '/sendMessage?chat_id='+ terrarium['user'] + '&text=' + 'Hey, the humidity of ' + terrarium['ID'] + ' is not correct. I suggest you to move or fill the water bowl.')
+                            r.raise_for_status()
+                        except requests.HTTPError as err:
+                            print err
 
             time.sleep(15*60)
 

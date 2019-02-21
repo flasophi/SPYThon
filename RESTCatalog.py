@@ -1,6 +1,6 @@
 # The Catalog is accessible through REST web services.
 # The broker is identified with broker_IP and broker_port. It is set as written in the Catalog.txt file.
-# Users are stored as: ID, nickname.
+# Users are stored as: chat_id, nickname.
 # Devices can be terraria or control strategies.
 # - GET: - /broker/ -> Retrieve information about IP address and port of the message broker in the platform
 #        - /terraria/ -> Retrieve list of registered terraria
@@ -9,17 +9,17 @@
 #        - /user?ID=<id> -> Retrieve information about a user with a specific id
 #        - associate?IDTerr=<IDTerrarium>&IDUs=<IDUser> -> Associate a terrarium to a user
 #        - changetemp?IDTerr=<IDTerrarium>&temp=<temp>
-#        - changelightcycle?IDTerr=<IDTerrarium>&begin=<hour_begin>&duration=<durationhours>
+#        - changelightcycle?IDTerr=<IDTerrarium>&dawn=<hour_begin>&dawn=<hour_stop>
 
 #
 # - POST: - /add_device/terrarium     ->  Registration or update of a terrarium
-#         - /add_device/tempcontrol   ->  Registration or update of a control (can be done only by the control itself)
-#         - /add_device/lightcontrol  ->  Registration or update of a control (can be done only by the control itself)
+#         - /add_device/tempcontrol   ->  Registration or update of a control
+#         - /add_device/lightcontrol  ->  Registration or update of a control
 #         - /add_user/                -> Registration or update of a user
 #
-# -DELETE: - /device/terrarium    -> delete a device (done automatically every 2 minutes for devices older than 30 minutes)
-#          - /device/tempcontrol  -> delete a device (done automatically every 2 minutes for devices older than 30 minutes)
-#          - /device/lightcontrol -> delete a device (done automatically every 2 minutes for devices older than 30 minutes)
+# -DELETE: - /device/terrarium    -> delete a device (done automatically for devices older than 30 minutes)
+#          - /device/tempcontrol  -> delete a device (done automatically for devices older than 30 minutes)
+#          - /device/lightcontrol -> delete a device (done automatically for devices older than 30 minutes)
 #          - /user/               -> delete a user
 
 import cherrypy
@@ -103,9 +103,12 @@ class RESTCatalog:
                 raise cherrypy.HTTPError(400)
 
             if temp == 'null':
-                temp = None
+                temp_cat = None
 
-            ip, port = self.catalog.changetemp(IDTerr, temp)
+            else:
+                temp_cat = temp
+
+            ip, port = self.catalog.changetemp(IDTerr, temp_cat)
 
             if ip == "Error":
                 raise cherrypy.HTTPError(404)
@@ -126,10 +129,14 @@ class RESTCatalog:
                 raise cherrypy.HTTPError(400, 'Incorrect request format')
 
             if dawn == 'null':
-                dawn = None
-                dusk = None
+                dawn_cat = None
+                dusk_cat = None
 
-            ip, port = self.catalog.changelightcycle(IDTerr, dawn, dusk)
+            else:
+                dawn_cat = dawn
+                dusk_cat = dusk
+
+            ip, port = self.catalog.changelightcycle(IDTerr, dawn_cat, dusk_cat)
 
             if ip == "Error":
                 raise cherrypy.HTTPError(404)
@@ -146,7 +153,7 @@ class RESTCatalog:
                 self.catalog.deleteuser(params['UserID'])
             except:
                 raise cherrypy.HTTPError(400, 'Incorrect request format')
-        
+
         else:
             raise cherrypy.HTTPError(400, 'Incorrect request format')
 
