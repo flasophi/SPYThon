@@ -1,0 +1,1 @@
+{"catalogIP": "192.168.1.128" , "deviceID" : "nagini", "psw":"sorbettoallimone" }	
