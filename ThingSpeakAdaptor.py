@@ -148,7 +148,7 @@ if __name__ == "__main__":
     enThread.start()
     tdsm.start()
     time.sleep(2)
-    tdsm.mySubscribe('/#')
+    tdsm.mySubscribe('/SPYthon/#')
 
     while True:
         time.sleep(1)
