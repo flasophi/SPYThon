@@ -113,6 +113,9 @@ class EnergyThread(threading.Thread):
 		while True:
 			actualMonth = datetime.datetime.now().month
 			if (self.now != actualMonth):
+				self.pEstimate.energyLight = 0
+				self.pEstimate.energyHeat = 0
+				self.pEstimate.energyRPi = 0
 				payload = {"api_key" : "9N2P4LUVSZOE63MN"}
 				r = requests.delete("https://api.thingspeak.com/channels/702275/feeds.json", data = payload)
 				print "data cleared"
